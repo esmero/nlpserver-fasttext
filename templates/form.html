@@ -4,7 +4,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="NLP Server Console">
+    <meta name="description" content="NLP-fasttext Server Console">
     <title>NLP Server</title>
 
     <!-- Bootstrap core CSS -->
@@ -13,9 +13,9 @@
   </head>
   <body>
     <div class="d-flex flex-column flex-md-row align-items-center p-3 px-md-4 mb-3 bg-white border-bottom shadow-sm">
-        <h5 class="my-0 mr-md-auto font-weight-normal">NLP Server - API Console</h5>
+        <h5 class="my-0 mr-md-auto font-weight-normal">NLP Serverwith FastText - API Console</h5>
         <nav class="my-2 my-md-0 mr-md-3">
-            <a class="p-2 text-dark" href="https://github.com/web64/nlpserver">Documentation</a>
+            <a class="p-2 text-dark" href="https://github.com/digitaldogsbody/nlpserver-fasttext">Documentation</a>
         </nav>
         <a class="btn btn-outline-primary" href="/status">Status</a>
     </div>
@@ -59,13 +59,33 @@
                     <div class="card-deck mb-3 text-center">
                         <div class="card mb-4 shadow-sm">
                             <div class="card-header">
-                                <h4 class="my-0 font-weight-normal">Language Detection</h4>
+                                <h4 class="my-0 font-weight-normal">Language Detection - langid</h4>
                             </div>
                             <div class="card-body">
                                 <p class="text-left"><strong>GET/POST - /langid {text}</strong></p>
                                 <form action="/langid" method="POST">
                                     <div class="form-group">
                                         <textarea name="text" id="" cols="30" rows="10"class="form-control" placeholder="Text..."></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-lg btn-block btn-success">Submit</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-deck mb-3 text-center">
+                        <div class="card mb-4 shadow-sm">
+                            <div class="card-header">
+                                <h4 class="my-0 font-weight-normal">Language Detection - FastText</h4>
+                            </div>
+                            <div class="card-body">
+                                <p class="text-left"><strong>GET/POST - /fasttext {text} {predictions}</strong></p>
+                                <form action="/fasttext" method="POST">
+                                    <div class="form-group">
+                                        <textarea name="text" id="" cols="30" rows="10"class="form-control" placeholder="Text..."></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="predictions">Number of predictions:</label>
+                                        <input type="number" name="predictions" min="1" max="10" class="form-control" value="1">
                                     </div>
                                     <button type="submit" class="btn btn-lg btn-block btn-success">Submit</button>
                                 </form>
@@ -239,7 +259,7 @@
       <div class="col-6 col-md">
         <h5>Github</h5>
         <ul class="list-unstyled text-small">
-          <li><a class="text-muted" href="https://github.com/web64/nlpserver">NLP Server</a></li>
+          <li><a class="text-muted" href="https://github.com/digitaldogsbody/nlpserver-fasttext">NLP Server with FastText</a></li>
           <li><a class="text-muted" href="https://github.com/web64/php-nlp-client">PHP Client</a></li>
           <li><a class="text-muted" href="https://github.com/web64/laravel-nlp">Laravel NLP Package</a></li>
         </ul>
@@ -249,6 +269,9 @@
       <div class="col-6 col-md">
         <h5>About</h5>
         <ul class="list-unstyled text-small">
+          <li>FastText addition by:</li>
+          <li><a class="text-muted" href="http://github.com/digitaldogsbody">DigitalDogsbody</a></li>
+          <li>Original code by:</li>
           <li><a class="text-muted" href="http://web64.com/">http://web64.com/</a></li>
           <li><a class="text-muted" href="https://twitter.com/web64">Follow @web64 on Twitter</a></li>
         </ul>
