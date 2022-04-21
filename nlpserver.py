@@ -1,5 +1,5 @@
 #
-#	NLP Server: https://github.com/web64/nlpserver
+#	NLP Server with FastText: https://github.com/digitaldogsbody/nlpserver-fasttext
 #
 #	To run:
 # 	$ nohup python3 nlpserver.py  >logs/nlpserver_out.log 2>logs/nlpserver_errors.log &
@@ -15,14 +15,14 @@ app = Flask(__name__)
 default_data = {}
 default_data['web64'] = {
 		'app': 'nlpserver',
-		'version':	'1.0.1',
-		'last_modified': '2019-01-15',
-		'documentation': 'http://nlpserver.web64.com/',
-		'github': 'https://github.com/web64/nlp-server',
-		'endpoints': ['/status','/gensim/summarize', '/polyglot/neighbours', '/langid', '/polyglot/entities', '/polyglot/sentiment', '/newspaper', '/readability', '/spacy/entities', '/afinn'],
+		'version':	'1.0.2',
+		'last_modified': '2022-04-21',
+		'documentation': 'https://github.com/digitaldogsbody/nlpserver-fasttext/README.md',
+		'github': 'https://github.com/digitaldogsbody/nlpserver-fasttext',
+		'endpoints': ['/status','/gensim/summarize', '/polyglot/neighbours', '/langid', '/polyglot/entities', '/polyglot/sentiment', '/newspaper', '/readability', '/spacy/entities', '/afinn', '/fasttext'],
 	}
 
-default_data['message'] = 'NLP Server by web64.com'
+default_data['message'] = 'NLP Server by web64.com - with fasttext addition by digitaldogsbody'
 data = default_data
 
 @app.route("/")
@@ -87,6 +87,11 @@ def status():
 			status = dwnld.status(info)
 			if info.id.startswith('LANG:') and status != 'not installed':
 				data['polyglot_lang_models'][info.id] = status
+	
+	try:
+		import fasttext
+	except ImportError:
+		data['missing_libraries'].append('fasttext')
 
 	return jsonify(data)
 
@@ -465,6 +470,68 @@ def newspaper():
 
 	return jsonify(data)
 
+
+@app.route("/fasttext", methods=['GET', 'POST'])
+def fasttext():
+	import fasttext
+
+	data = dict(default_data)
+	data['message'] = "FastText Language Detection -  Parameters: 'text', 'predictions' number of predictions to return (default: 1)"
+	data['fasttext'] = {}
+	params = {}
+	
+
+	if request.method == 'GET':
+		params['text'] = request.args.get('text')
+		params['predictions'] = request.args.get('predictions')
+	elif request.method == 'POST':
+		params = request.form # postdata
+	else:
+		data['error'] = 'Invalid request method'
+		return jsonify(data)
+
+	if not params:
+		data['error'] = 'Missing parameters'
+		return jsonify(data)
+
+	if not params['text']:
+		data['error'] = '[text] parameter not found'
+		return jsonify(data)
+
+	if not params['predictions']:
+		params['predictions'] = 1
+	else:
+		try:
+			if int(params['predictions']) < 1:
+				data['error'] = '[predictions] parameter cannot be less than 1'
+				return jsonify(data)
+		except (TypeError, ValueError):
+			data['error'] = '[predictions] parameter must be an integer'
+			return jsonify(data)
+
+	try:
+		ft = fasttext.load_model("lid.176.bin")
+	except ValueError:
+		data['error'] = 'lid.176.bin model not found'
+		return jsonify(data)
+	
+	if not ft:
+		data['error'] = 'FastText model not initialised'
+		return jsonify(data)
+
+	lang_data = ft.predict( params['text'], k=int(params['predictions']) )
+	
+	langs = map(lambda x: x[9:], lang_data[0]) # remove __label__ prefix
+	scores = lang_data[1]
+	results = list(zip(langs, scores))
+
+	data['fasttext']['language'] = results[0][0]
+	data['fasttext']['score'] = results[0][1]
+	data['fasttext']['results'] = results
+
+	data['message'] = "Detected Language: " + data['fasttext']['language']
+
+	return jsonify(data)
 
 # @app.route("/tester", methods=['GET', 'POST'])
 # def tester():
