@@ -9,6 +9,11 @@ NLP Server provides a simple API for non-python programming languages to access 
 
 The server is simple to set up and easy to integrate with your programming language of choice.
 
+## DigitalDogsbody Fork
+This fork adds a second language prediction service, using the [FastText](https://fasttext.cc/) library, in support of the fantastic work of [The Archipelago Team](https://github.com/esmero).
+
+An extra endpoint has been added at `/fasttext` and is documented below. Additionally, the web interface, requirements file and license file have been updated. Everything else is left as upstream and the extra functionality of this fork is only for the Python version herein - ports to the PHP and Laravel versions are welcome :-)
+
 ## PHP & Laravel clients
 A PHP library and a Laraval package is available:
 * https://github.com/web64/php-nlp-client
@@ -16,10 +21,11 @@ A PHP library and a Laraval package is available:
 
 
 ## Step1: Core Installation
-The NLP Server has been tested on Ubuntu, but should work on other versions of Linux.
+The upstream NLP Server project has been tested on Ubuntu, and this fork has been tested on Debian Buster (via the [Archipelago nlpserver Dockerfile](https://github.com/esmero/archipelago-docker-images/tree/main/nlpserver)) but should work on other versions of Linux.
+
 ```bash
-git clone https://github.com/web64/nlpserver.git
-cd nlpserver
+git clone https://github.com/digitaldogsbody/nlpserver-fasttext.git
+cd nlpserver-fasttext
 
 sudo apt-get install -y libicu-dev python3-pip
 sudo apt-get install polyglot
@@ -50,7 +56,10 @@ python3 -m spacy download en
 python3 -m spacy download es
 python3 -m spacy download xx
 ```
-
+### Step 4: Download the FastText language classification model
+```bash
+curl -L "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin" -O
+```
 
 ### Detailed Installation
 If you have any problems installing from requirements.txt you can instead install the libraries one by one.
@@ -73,6 +82,7 @@ sudo pip3 install readability-lxml
 sudo pip3 install BeautifulSoup4
 sudo pip3 install afinn
 sudo pip3 install textblob
+sudo pip3 install git+https://github.com/facebookresearch/fastText.git
 ```
 The /status api endpoint will list missing python modules: http://localhost:6400/status
 
@@ -126,9 +136,11 @@ Endpoint|Method|Parameters|Info|Library
 /polyglot/entities|POST|text,lang|Entity extraction and sentiment analysis for provided text|polyglot
 /polyglot/sentiment|POST|text,lang|Sentiment analysis for provided text|polyglot
 /polyglot/neighbours|GET|word,lang|Embeddings: neighbouring words|polyglot
-/langid|GET,POST|text|Language detection for provided text|langid
+/langid|GET,POST|text|Language detection for provided text with langid|langid
+/fasttext|GET,POST|text,predictions|Language dectection for provided text with FastText|fasttext
 /gensim/summarize|POST|text,word_count|Summarization of long text|gensim
 /spacy/entities|POST|text,lang|Entity extraction for provided text in given language|SpaCy
+
 
 ## Usage
 For API responses see /response_examples/ directory.
@@ -149,7 +161,7 @@ Example JSON response: https://raw.githubusercontent.com/web64/nlpserver/master/
 curl -d "html=<html>...</html>" http://localhost:6400/newspaper
 ```
 
-### Language Detection
+### Language Detection with langid
 `GET|POST /langid?text=what+language+is+this`
 
 ```bash
@@ -162,6 +174,47 @@ langid: {
   "language": "en",
   "score": -42.31864953041077
 }
+```
+
+### Language Detection with FastText
+`GET|POST /fasttext?text=what+language+is+this`
+
+```bash
+curl http://localhost:6400/fasttext?text=what+language+is+this
+```
+
+Returns language code of provided text
+```json
+"fasttext": {
+  "language": "en",
+  "score": 0.9485139846801758
+}
+```
+
+An optional parameter `predictions` allows more than one candidate language to be predicted by fasttext:
+```bash
+curl http://localhost:6400/fasttext?text=what+language+is+this&predictions=3
+```
+
+```json
+"fasttext": {
+    "language": "en",
+    "score": 0.9485139846801758,
+    "results": [
+      [
+        "en",
+        0.9485139846801758
+      ],
+      [
+        "bn",
+        0.009047050029039383
+      ],
+      [
+        "ru",
+        0.005073812324553728
+      ]
+    ]
+  }
 ```
 
 ### Polyglot Entity Extraction & Sentiment Analysis
