@@ -1,4 +1,4 @@
-# NLP Server
+# NLP Server with FastText
 <p align="center">
   <img src="http://cdn.web64.com/nlp-norway/nlp-server-2.png" width="400">
 </p>
