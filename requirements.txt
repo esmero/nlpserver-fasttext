@@ -12,5 +12,6 @@ readability-lxml
 BeautifulSoup4
 afinn
 textblob
+fasttext @ git+https://github.com/facebookresearch/fastText.git
 #summa
 #pattern
