@@ -556,6 +556,7 @@ def yolo():
 	from PIL import Image
 	from keras.preprocessing.image import img_to_array
 	from sklearn import preprocessing
+	import json
 
 	intermediate_features = []
 
@@ -629,15 +630,15 @@ def yolo():
 	for object_detect_result in object_detect_results:
 		if hasattr(object_detect_result, "obb") and object_detect_result.obb is not None:  # Access the .obb attribute instead of .boxes
 			print('An obb model')
-			data['yolo']['objects'] = object_detect_result.tojson(True)
+			data['yolo']['objects'] = json.loads(object_detect_result.tojson(True))
 		elif hasattr(object_detect_result, "boxes")  and object_detect_result.boxes is not None:
 			print('Not an obb model')
-			data['yolo']['objects'] = object_detect_result.tojson(True)
+			data['yolo']['objects'] = json.loads(object_detect_result.tojson(True))
 		else:
 			data['error'] = 'No features detected'
-			data['yolo']['objects'] = object_detect_result.tojson(True)
+			data['yolo']['objects'] = json.loads(object_detect_result.tojson(True))
 		
-	data['yolo']['modelinfo'] = {'train_args': model.ckpt["train_args"], 'date': model.ckpt["date"], 'name': 'model.ckpt["name"]'} 
+	data['yolo']['modelinfo'] = {'train_args': model.ckpt["train_args"], 'date': model.ckpt["date"], 'version': model.ckpt["version"]} 
 	
 	# features =  extract_features(intermediate_features=intermediate_features,model=model, img = img) // More advanced. Step 2
 	# The embed method is pretty new. 
@@ -648,7 +649,7 @@ def yolo():
 	# This "should" return a Unit Vector so we can use "Cosine" in Solr
 	X_l1 = preprocessing.normalize([vector.detach().tolist()], norm='l1')
 	# see https://nightlies.apache.org/solr/draft-guides/solr-reference-guide-antora/solr/10_0/query-guide/dense-vector-search.html
-	data['yolo']['vector'] = str(X_l1[0])
+	data['yolo']['vector'] = X_l1[0].tolist()
 	data['message'] = 'done'
 
 	return jsonify(data)
