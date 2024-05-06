@@ -11,6 +11,11 @@ app = Flask(__name__)
 
 #  configurations
 #app.config['var1'] = 'test'
+app.config["YOLO_MODEL_NAME"] = "yolov8m.pt"
+for variable, value in os.environ.items():
+	if variable == "YOLO_MODEL_NAME":
+		# Can be set via Docker ENV
+		app.config["YOLO_MODEL_NAME"] = value
 
 default_data = {}
 default_data['web64'] = {
@@ -606,9 +611,9 @@ def yolo():
 		params['labels'] = ['face']
 
 	try:
-		model = YOLO('models/yolo/yolov8m.pt') 
+		model = YOLO('models/yolo/'+ app.config["YOLO_MODEL_NAME"]) 
 	except ValueError:
-		data['error'] = 'models/yolo/yolov8m.pt'
+		data['error'] = 'models/yolo/'+ app.config["YOLO_MODEL_NAME"] + ' not found'
 		return jsonify(data)
 	
 	if not model:
