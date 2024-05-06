@@ -12,10 +12,13 @@ app = Flask(__name__)
 #  configurations
 #app.config['var1'] = 'test'
 app.config["YOLO_MODEL_NAME"] = "yolov8m.pt"
+app.config["MOBILENET_MODEL_NAME"] = "mobilenet_v3_small.tflite"
 for variable, value in os.environ.items():
 	if variable == "YOLO_MODEL_NAME":
 		# Can be set via Docker ENV
 		app.config["YOLO_MODEL_NAME"] = value
+	if variable == "MOBILENET_MODEL_NAME":	
+		app.config["MOBILENET_MODEL_NAME"] = value
 
 default_data = {}
 default_data['web64'] = {
@@ -24,7 +27,7 @@ default_data['web64'] = {
 		'last_modified': '2024-05-05',
 		'documentation': 'https://github.com/esmero/nlpserver-fasttext/README.md',
 		'github': 'https://github.com/esmero/nlpserver-fasttext',
-		'endpoints': ['/status','/gensim/summarize', '/polyglot/neighbours', '/langid', '/polyglot/entities', '/polyglot/sentiment', '/newspaper', '/readability', '/spacy/entities', '/afinn', '/fasttext', '/image/yolo'],
+		'endpoints': ['/status','/gensim/summarize', '/polyglot/neighbours', '/langid', '/polyglot/entities', '/polyglot/sentiment', '/newspaper', '/readability', '/spacy/entities', '/afinn', '/fasttext', '/image/yolo', 'image/mobilenet'],
 	}
 
 default_data['message'] = 'NLP Server by web64.com - with fasttext addition by digitaldogsbody'
@@ -549,11 +552,8 @@ def yolo():
 	import pandas as pd
 	import numpy as np
 	from pathlib import Path
-	from ultralytics import YOLO
-	from PIL import Image
 	import requests
 	from io import BytesIO
-	from PIL import Image
 	from keras.preprocessing.image import img_to_array
 	from sklearn import preprocessing
 	import json
@@ -646,17 +646,103 @@ def yolo():
 	print(vector.shape[0])
 	# Vector size for this layer (i think by default it will be numlayers - 2 so 20) is 576
 	# array.reshape(-1, 1) if your data has a single feature or array.reshape(1, -1) if it contains a single sample
-	# This "should" return a Unit Vector so we can use "Cosine" in Solr
+	# This "should" return a Unit Vector so we can use "dot_product" in Solr
 	X_l1 = preprocessing.normalize([vector.detach().tolist()], norm='l1')
 	# see https://nightlies.apache.org/solr/draft-guides/solr-reference-guide-antora/solr/10_0/query-guide/dense-vector-search.html
 	data['yolo']['vector'] = X_l1[0].tolist()
 	data['message'] = 'done'
 
 	return jsonify(data)
+@app.route("/image/mobilenet", methods=['GET', 'POST'])
+def mobilenet():
+	# Import your Libraries 
+	from PIL import Image
+	from pathlib import Path
+	import pandas as pd
+	import numpy as np
+	from pathlib import Path
+	import requests
+	from io import BytesIO
+	from sklearn import preprocessing
+	import mediapipe as mp
+	from mediapipe.tasks import python
+	from mediapipe.tasks.python import vision
+
+	intermediate_features = []
+
+	def loadImage(url, size = 480):
+		try:
+			response = requests.get(url)
+			response.raise_for_status()
+		except requests.exceptions.HTTPError as err:
+			data['error'] =  err.strerror
+			return jsonify(data)
+	
+		img_bytes = BytesIO(response.content)
+		img = Image.open(img_bytes)
+		img = img.convert('RGB')
+		img = img.resize((size,size), Image.NEAREST)
+		# Media pipe uses a different format than YOLO, img here is PIL
+		img = np.asarray(img)
+		return img
+	
+	data = dict(default_data)
+	data['message'] = "mobilenet -  Parameters: 'iiif_image_url"
+	data['mobilenet'] = {}
+	params = {}
+	
+
+	if request.method == 'GET':
+		params['iiif_image_url'] = request.args.get('iiif_image_url')
+	elif request.method == 'POST':
+		params = request.form # postdata
+	else:
+		data['error'] = 'Invalid request method'
+		return jsonify(data)
+
+	if not params:
+		data['error'] = 'Missing parameters'
+		return jsonify(data)
+
+	if not params['iiif_image_url']:
+		data['error'] = '[iiif_image_url] parameter not found'
+		return jsonify(data)
+	try:
+		# Create options for Image Embedder
+		base_options = python.BaseOptions(model_asset_path='models/mobilenet/' + app.config["MOBILENET_MODEL_NAME"])
+		l2_normalize = True #@param {type:"boolean"}
+		quantize = True #@param {type:"boolean"}
+		options = vision.ImageEmbedderOptions(
+    	base_options=base_options, l2_normalize=l2_normalize, quantize=quantize)
+
+
+# Create Image Embedder
+		with vision.ImageEmbedder.create_from_options(options) as embedder:
+
+  		# Format images for MediaPipe
+			img = loadImage(params['iiif_image_url'], 480)
+			image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img)
+			embedding_result = embedder.embed(image)
+
+	except ValueError:
+		data['error'] = 'models/mobilenet/' + app.config["MOBILENET_MODEL_NAME"] + ' not found'
+		return jsonify(data)
+
+
+	vector = embedding_result.embeddings[0].embedding
+	print(embedding_result.embeddings[0].embedding.shape[0])
+	# Vector size for this layer (inumlayers - 1) is 1024
+	# This "should" return a Unit Vector so we can use "dot_product" in Solr
+	X_l1 = preprocessing.normalize([vector], norm='l1')
+	# see https://nightlies.apache.org/solr/draft-guides/solr-reference-guide-antora/solr/10_0/query-guide/dense-vector-search.html
+	data['mobilenet']['vector'] = X_l1[0].tolist()
+	data['message'] = 'done'
+	return jsonify(data)
+
 # @app.route("/tester", methods=['GET', 'POST'])
 # def tester():
 # 	return render_template('form.html')
 
-app.run(host='0.0.0.0', port=6400, debug=False)
+app.run(host='0.0.0.0', port=6401, debug=False)
 
 

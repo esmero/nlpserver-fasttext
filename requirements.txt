@@ -23,5 +23,6 @@ scikit-learn #To use PCA
 keras # keras.preprocessing.image
 tensorflow
 insightface # for face detection. Arcface used by Apple
+mediapipe # for mobilenetv3 embedder
 #summa
 #pattern
