@@ -550,6 +550,7 @@ def yolo():
 	from io import BytesIO
 	from PIL import Image
 	from keras.preprocessing.image import img_to_array
+	from sklearn import preprocessing
 
 	intermediate_features = []
 
@@ -638,8 +639,11 @@ def yolo():
 	vector = model.embed(img, verbose=False)[0]
 	print(vector.shape[0])
 	# Vector size for this layer (i think by default it will be numlayers - 2 so 20) is 576
-	vector_string = str(vector.detach().tolist())
-	data['yolo']['vector'] = vector_string
+	# array.reshape(-1, 1) if your data has a single feature or array.reshape(1, -1) if it contains a single sample
+	# This "should" return a Unit Vector so we can use "Cosine" in Solr
+	X_l1 = preprocessing.normalize([vector.detach().tolist()], norm='l1')
+	# see https://nightlies.apache.org/solr/draft-guides/solr-reference-guide-antora/solr/10_0/query-guide/dense-vector-search.html
+	data['yolo']['vector'] = str(X_l1[0])
 	data['message'] = 'done'
 
 	return jsonify(data)
