@@ -1,6 +1,8 @@
+setuptools
 pyicu
 numpy
 Flask
+flask
 polyglot
 morfessor
 langid
@@ -13,5 +15,13 @@ BeautifulSoup4
 afinn
 textblob
 fasttext @ git+https://github.com/facebookresearch/fastText.git
+torch
+pillow #Fork of PIL
+ultralytics
+pandas
+scikit-learn #To use PCA
+keras # keras.preprocessing.image
+tensorflow
+insightface # for face detection. Arcface used by Apple
 #summa
 #pattern

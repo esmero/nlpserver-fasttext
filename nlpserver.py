@@ -15,11 +15,11 @@ app = Flask(__name__)
 default_data = {}
 default_data['web64'] = {
 		'app': 'nlpserver',
-		'version':	'1.0.2',
-		'last_modified': '2022-04-21',
-		'documentation': 'https://github.com/digitaldogsbody/nlpserver-fasttext/README.md',
-		'github': 'https://github.com/digitaldogsbody/nlpserver-fasttext',
-		'endpoints': ['/status','/gensim/summarize', '/polyglot/neighbours', '/langid', '/polyglot/entities', '/polyglot/sentiment', '/newspaper', '/readability', '/spacy/entities', '/afinn', '/fasttext'],
+		'version':	'1.1.0',
+		'last_modified': '2024-05-05',
+		'documentation': 'https://github.com/esmero/nlpserver-fasttext/README.md',
+		'github': 'https://github.com/esmero/nlpserver-fasttext',
+		'endpoints': ['/status','/gensim/summarize', '/polyglot/neighbours', '/langid', '/polyglot/entities', '/polyglot/sentiment', '/newspaper', '/readability', '/spacy/entities', '/afinn', '/fasttext', '/image/yolo'],
 	}
 
 default_data['message'] = 'NLP Server by web64.com - with fasttext addition by digitaldogsbody'
@@ -533,6 +533,116 @@ def fasttext():
 
 	return jsonify(data)
 
+@app.route("/image/yolo", methods=['GET', 'POST'])
+def yolo():
+	# Import your Libraries 
+	import torch
+	from torchvision import transforms
+	from PIL import Image, ImageDraw
+	from pathlib import Path
+	from ultralytics import YOLO
+	import pandas as pd
+	import numpy as np
+	from pathlib import Path
+	from ultralytics import YOLO
+	from PIL import Image
+	import requests
+	from io import BytesIO
+	from PIL import Image
+	from keras.preprocessing.image import img_to_array
+
+	intermediate_features = []
+
+	def hook_fn(module, input, output):
+		intermediate_features.append(output)
+
+	def extract_features(intermediate_features, model, img, layer_index=20):##Choose the layer that fit your application
+		hook = model.model.model[layer_index].register_forward_hook(hook_fn)
+		print(hook)
+		with torch.no_grad():
+			model(img)
+		hook.remove()
+		return intermediate_features[0]  # Access the first element of the list
+	def loadImage(url, size = 640):
+		try:
+			response = requests.get(url)
+			response.raise_for_status()
+		except requests.exceptions.HTTPError as err:
+			data['error'] =  err.strerror
+			return jsonify(data)
+	
+		img_bytes = BytesIO(response.content)
+		img = Image.open(img_bytes)
+		img = img.convert('RGB')
+		img = img.resize((size,size), Image.NEAREST)
+		img = img_to_array(img)
+		return img
+	
+	data = dict(default_data)
+	data['message'] = "Yolo -  Parameters: 'iiif_image_url', 'labels' a list of valid labels for object detection (default: face)"
+	data['yolo'] = {}
+	params = {}
+	
+
+	if request.method == 'GET':
+		params['iiif_image_url'] = request.args.get('iiif_image_url')
+		params['labels'] = request.args.getlist('labels')
+	elif request.method == 'POST':
+		params = request.form # postdata
+	else:
+		data['error'] = 'Invalid request method'
+		return jsonify(data)
+
+	if not params:
+		data['error'] = 'Missing parameters'
+		return jsonify(data)
+
+	if not params['iiif_image_url']:
+		data['error'] = '[iiif_image_url] parameter not found'
+		return jsonify(data)
+
+	if not params['labels']:
+		params['labels'] = ['face']
+
+	try:
+		model = YOLO('models/yolo/yolov8m.pt') 
+	except ValueError:
+		data['error'] = 'models/yolo/yolov8m.pt'
+		return jsonify(data)
+	
+	if not model:
+		data['error'] = 'yolov8 model not initialized'
+		return jsonify(data)
+
+	img = loadImage(params['iiif_image_url'], 640)
+	data['yolo']['objects']  = []
+	data['yolo']['modelinfo']  = {}
+	object_detect_results = model(img, conf=0.1) 
+	# model.names gives me the classes.
+	# We don't know if the user set tge obb model or the regular one, so we will have to iterate over both options, bbox and obb
+	for object_detect_result in object_detect_results:
+		if hasattr(object_detect_result, "obb") and object_detect_result.obb is not None:  # Access the .obb attribute instead of .boxes
+			print('An obb model')
+			data['yolo']['objects'] = object_detect_result.tojson(True)
+		elif hasattr(object_detect_result, "boxes")  and object_detect_result.boxes is not None:
+			print('Not an obb model')
+			data['yolo']['objects'] = object_detect_result.tojson(True)
+		else:
+			data['error'] = 'No features detected'
+			data['yolo']['objects'] = object_detect_result.tojson(True)
+		
+	data['yolo']['modelinfo'] = {'train_args': model.ckpt["train_args"], 'date': model.ckpt["date"], 'name': 'model.ckpt["name"]'} 
+	
+	# features =  extract_features(intermediate_features=intermediate_features,model=model, img = img) // More advanced. Step 2
+	# The embed method is pretty new. 
+	vector = model.embed(img, verbose=False)[0]
+	print(vector.shape[0])
+	# Vector size for this layer (i think by default it will be numlayers - 2 so 20) is 576
+	vector_string = str(vector.detach().tolist())
+	data['yolo']['vector'] = vector_string
+	data['message'] = 'done'
+
+	return jsonify(data)
 # @app.route("/tester", methods=['GET', 'POST'])
 # def tester():
 # 	return render_template('form.html')
