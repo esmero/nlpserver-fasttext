@@ -24,5 +24,6 @@ keras # keras.preprocessing.image
 tensorflow
 insightface # for face detection. Arcface used by Apple
 mediapipe # for mobilenetv3 embedder
+sentence-transformers #For bert based text embeddings
 #summa
 #pattern
