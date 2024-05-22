@@ -768,6 +768,6 @@ def mobilenet():
 # def tester():
 # 	return render_template('form.html')
 
-app.run(host='0.0.0.0', port=6401, debug=False)
+app.run(host='0.0.0.0', port=6400, debug=False)
 
 
