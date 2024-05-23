@@ -637,12 +637,11 @@ def yolo():
 		if hasattr(object_detect_result, "obb") and object_detect_result.obb is not None:  # Access the .obb attribute instead of .boxes
 			print('An obb model')
 			data['yolo']['objects'] = json.loads(object_detect_result.tojson(True))
-		elif hasattr(object_detect_result, "boxes") and object_detect_result.boxes is not None and object_detect_result.probs is not None:
+		elif hasattr(object_detect_result, "boxes") and object_detect_result.boxes is not None:
 			print('Not an obb model')
 			if type(object_detect_result) != 'NoneType':
 				data['yolo']['objects'] = json.loads(object_detect_result.tojson(True))
 		else:
-			data['error'] = 'No features detected'
 			data['yolo']['objects'] = []
 		
 	data['yolo']['modelinfo'] = {'train_args': model.ckpt["train_args"], 'date': model.ckpt["date"], 'version': model.ckpt["version"]} 
