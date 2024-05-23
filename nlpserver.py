@@ -12,7 +12,7 @@ app = Flask(__name__)
 #  configurations
 #app.config['var1'] = 'test'
 app.config["YOLO_MODEL_NAME"] = "yolov8m.pt"
-app.config["MOBILENET_MODEL_NAME"] = "mobilenet_v3_large.tflite"
+app.config["MOBILENET_MODEL_NAME"] = "mobilenet_v3_small.tflite"
 app.config["EFFICIENTDET_DETECT_MODEL_NAME"] = "efficientdet_lite2.tflite"
 app.config["MOBILENET_DETECT_MODEL_NAME"] = "ssd_mobilenet_v2.tflite"
 for variable, value in os.environ.items():
@@ -571,7 +571,6 @@ def yolo():
 
 	def extract_features(intermediate_features, model, img, layer_index=20):##Choose the layer that fit your application
 		hook = model.model.model[layer_index].register_forward_hook(hook_fn)
-		print(hook)
 		with torch.no_grad():
 			model(img)
 		hook.remove()
@@ -600,6 +599,7 @@ def yolo():
 	if request.method == 'GET':
 		params['iiif_image_url'] = request.args.get('iiif_image_url')
 		params['labels'] = request.args.getlist('labels')
+		params['norm'] = request.args.getlist('norm')
 	elif request.method == 'POST':
 		params = request.form # postdata
 	else:
@@ -617,6 +617,9 @@ def yolo():
 	if not params['labels']:
 		params['labels'] = ['face']
 
+	if params['norm'] not in ['l1','l2','max']:
+		params['norm'] = 'l2'
+	
 	try:
 		model = YOLO('models/yolo/'+ app.config["YOLO_MODEL_NAME"]) 
 	except ValueError:
@@ -654,7 +657,7 @@ def yolo():
 	# array.reshape(-1, 1) if your data has a single feature or array.reshape(1, -1) if it contains a single sample
 	# This "should" return a Unit Vector so we can use "dot_product" in Solr
     #  Even if Norm L1 is better for comparison, dot product on Solr gives me less than 1 of itself. So will try with L2
-	normalized = preprocessing.normalize([vector.detach().tolist()], norm='l2')
+	normalized = preprocessing.normalize([vector.detach().tolist()], norm=params['norm'])
 	# see https://nightlies.apache.org/solr/draft-guides/solr-reference-guide-antora/solr/10_0/query-guide/dense-vector-search.html
 	# interesting, this is never 1 sharp... like 1.000000005 etc ... mmmm print(np.dot(normalized[0], normalized[0]));
 	data['yolo']['vector'] = normalized[0].tolist()
@@ -701,7 +704,7 @@ def mobilenet():
 	params = {}
 	objects = []
 	
-
+	detect = True
 	if request.method == 'GET':
 		params['iiif_image_url'] = request.args.get('iiif_image_url')
 	elif request.method == 'POST':
@@ -717,6 +720,11 @@ def mobilenet():
 	if not params['iiif_image_url']:
 		data['error'] = '[iiif_image_url] parameter not found'
 		return jsonify(data)
+	if params['norm'] not in ['l1','l2','max']:
+		params['norm'] = 'l2'
+	if params['detect'] == False :
+		detect = False
+
 	try:
 		# Create options for Image Embedder
 		base_options_embedder = python.BaseOptions(model_asset_path='models/mobilenet/' + app.config["MOBILENET_MODEL_NAME"])
@@ -758,11 +766,9 @@ def mobilenet():
 	# Vector size for this layer (inumlayers - 1) is 1024
 	# This "should" return a Unit Vector so we can use "dot_product" in Solr
 	# in theory vision embedder here is already L2. But let's do it manually again.
-	normalized = preprocessing.normalize([vector], norm='l2')
-	print(np.dot(normalized[0], normalized[0]));
+	normalized = preprocessing.normalize([vector], norm=params['norm'])
 	# see https://nightlies.apache.org/solr/draft-guides/solr-reference-guide-antora/solr/10_0/query-guide/dense-vector-search.html
 	data['mobilenet']['vector'] = normalized[0].tolist()
-	
 	data['mobilenet']['objects'] = objects
 	data['message'] = 'done'
 	return jsonify(data)
