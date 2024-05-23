@@ -33,7 +33,7 @@ default_data['web64'] = {
 		'last_modified': '2024-05-05',
 		'documentation': 'https://github.com/esmero/nlpserver-fasttext/README.md',
 		'github': 'https://github.com/esmero/nlpserver-fasttext',
-		'endpoints': ['/status','/gensim/summarize', '/polyglot/neighbours', '/langid', '/polyglot/entities', '/polyglot/sentiment', '/newspaper', '/readability', '/spacy/entities', '/afinn', '/fasttext', '/image/yolo', 'image/mobilenet'],
+		'endpoints': ['/status','/gensim/summarize', '/polyglot/neighbours', '/langid', '/polyglot/entities', '/polyglot/sentiment', '/newspaper', '/readability', '/spacy/entities', '/afinn', '/fasttext', '/image/yolo', '/image/mobilenet'],
 	}
 
 default_data['message'] = 'NLP Server by web64.com - with fasttext addition by digitaldogsbody'
@@ -653,11 +653,11 @@ def yolo():
 	# Vector size for this layer (i think by default it will be numlayers - 2 so 20) is 576
 	# array.reshape(-1, 1) if your data has a single feature or array.reshape(1, -1) if it contains a single sample
 	# This "should" return a Unit Vector so we can use "dot_product" in Solr
-    #  Even if Norm L1 is better, dot product on Solr gives me less than 1 of itself. So will try with L2
-	X_l1 = preprocessing.normalize([vector.detach().tolist()], norm='l2')
+    #  Even if Norm L1 is better for comparison, dot product on Solr gives me less than 1 of itself. So will try with L2
+	normalized = preprocessing.normalize([vector.detach().tolist()], norm='l2')
 	# see https://nightlies.apache.org/solr/draft-guides/solr-reference-guide-antora/solr/10_0/query-guide/dense-vector-search.html
-	print(np.dot(X_l1[0], X_l1[0]));
-	data['yolo']['vector'] = X_l1[0].tolist()
+	# interesting, this is never 1 sharp... like 1.000000005 etc ... mmmm print(np.dot(normalized[0], normalized[0]));
+	data['yolo']['vector'] = normalized[0].tolist()
 	data['message'] = 'done'
 
 	return jsonify(data)
@@ -751,15 +751,17 @@ def mobilenet():
 			detector_results.detections[ml_result_index].bounding_box.origin_x = detector_results.detections[ml_result_index].bounding_box.origin_x/image.width
 			detector_results.detections[ml_result_index].bounding_box.origin_y = detector_results.detections[ml_result_index].bounding_box.origin_y/image.height
 			detector_results.detections[ml_result_index].bounding_box.width = detector_results.detections[ml_result_index].bounding_box.width/image.width
-			detector_results.detections[ml_result_index].bounding_box.height = detector_results.detections[ml_result_index].bounding_box.width/image.height
+			detector_results.detections[ml_result_index].bounding_box.height = detector_results.detections[ml_result_index].bounding_box.height/image.height
 		objects = detector_results.detections
 	vector = embedding_result.embeddings[0].embedding
 	# print(embedding_result.embeddings[0].embedding.shape[0])
 	# Vector size for this layer (inumlayers - 1) is 1024
 	# This "should" return a Unit Vector so we can use "dot_product" in Solr
-	X_l1 = preprocessing.normalize([vector], norm='l1')
+	# in theory vision embedder here is already L2. But let's do it manually again.
+	normalized = preprocessing.normalize([vector], norm='l2')
+	print(np.dot(normalized[0], normalized[0]));
 	# see https://nightlies.apache.org/solr/draft-guides/solr-reference-guide-antora/solr/10_0/query-guide/dense-vector-search.html
-	data['mobilenet']['vector'] = X_l1[0].tolist()
+	data['mobilenet']['vector'] = normalized[0].tolist()
 	
 	data['mobilenet']['objects'] = objects
 	data['message'] = 'done'
