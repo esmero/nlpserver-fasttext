@@ -12,7 +12,7 @@ app = Flask(__name__)
 #  configurations
 #app.config['var1'] = 'test'
 app.config["YOLO_MODEL_NAME"] = "yolov8m.pt"
-app.config["MOBILENET_MODEL_NAME"] = "mobilenet_v3_small.tflite"
+app.config["MOBILENET_MODEL_NAME"] = "mobilenet_v3_large.tflite"
 app.config["EFFICIENTDET_DETECT_MODEL_NAME"] = "efficientdet_lite2.tflite"
 app.config["MOBILENET_DETECT_MODEL_NAME"] = "ssd_mobilenet_v2.tflite"
 for variable, value in os.environ.items():
