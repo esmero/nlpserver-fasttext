@@ -619,7 +619,7 @@ def yolo():
 
 	if not params['norm']:
 		params['norm'] = 'l2'
-		
+
 	if params['norm'] and params['norm'] not in ['l1','l2','max']:
 		params['norm'] = 'l2'
 
@@ -708,7 +708,6 @@ def mobilenet():
 	params = {}
 	objects = []
 	
-	detect = True
 	if request.method == 'GET':
 		params['iiif_image_url'] = request.args.get('iiif_image_url')
 	elif request.method == 'POST':
@@ -724,10 +723,12 @@ def mobilenet():
 	if not params['iiif_image_url']:
 		data['error'] = '[iiif_image_url] parameter not found'
 		return jsonify(data)
+	if not params['norm']:
+		params['norm'] = 'l2'
+
 	if params['norm'] not in ['l1','l2','max']:
 		params['norm'] = 'l2'
-	if params['detect'] == False :
-		detect = False
+	
 
 	try:
 		# Create options for Image Embedder
