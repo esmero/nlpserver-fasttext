@@ -630,7 +630,7 @@ def yolo():
 	img = loadImage(params['iiif_image_url'], 640)
 	data['yolo']['objects']  = []
 	data['yolo']['modelinfo']  = {}
-	object_detect_results = model(img, conf=0.1) 
+	object_detect_results = model(img, conf=0.3)
 	# model.names gives me the classes.
 	# We don't know if the user set tge obb model or the regular one, so we will have to iterate over both options, bbox and obb
 	for object_detect_result in object_detect_results:
@@ -639,7 +639,7 @@ def yolo():
 			data['yolo']['objects'] = json.loads(object_detect_result.tojson(True))
 		elif hasattr(object_detect_result, "boxes") and object_detect_result.boxes is not None:
 			print('Not an obb model')
-			if type(object_detect_result) != 'NoneType' and len(object_detect_result.boxes) and object_detect_result.boxes[0].xywh == torch.Tensor:
+			if type(object_detect_result) != 'NoneType' and len(object_detect_result.boxes) and len(object_detect_result.boxes[0].xywh):
 				data['yolo']['objects'] = json.loads(object_detect_result.tojson(True))
 		else:
 			data['yolo']['objects'] = []
