@@ -617,8 +617,12 @@ def yolo():
 	if not params['labels']:
 		params['labels'] = ['face']
 
-	if params['norm'] not in ['l1','l2','max']:
+	if not params['norm']:
 		params['norm'] = 'l2'
+		
+	if params['norm'] and params['norm'] not in ['l1','l2','max']:
+		params['norm'] = 'l2'
+
 	
 	try:
 		model = YOLO('models/yolo/'+ app.config["YOLO_MODEL_NAME"]) 
