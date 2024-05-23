@@ -639,7 +639,7 @@ def yolo():
 			data['yolo']['objects'] = json.loads(object_detect_result.tojson(True))
 		elif hasattr(object_detect_result, "boxes") and object_detect_result.boxes is not None:
 			print('Not an obb model')
-			if type(object_detect_result) != 'NoneType':
+			if type(object_detect_result) != 'NoneType' and len(object_detect_result.boxes) and object_detect_result.boxes[0].xywh == torch.Tensor:
 				data['yolo']['objects'] = json.loads(object_detect_result.tojson(True))
 		else:
 			data['yolo']['objects'] = []
@@ -653,8 +653,10 @@ def yolo():
 	# Vector size for this layer (i think by default it will be numlayers - 2 so 20) is 576
 	# array.reshape(-1, 1) if your data has a single feature or array.reshape(1, -1) if it contains a single sample
 	# This "should" return a Unit Vector so we can use "dot_product" in Solr
-	X_l1 = preprocessing.normalize([vector.detach().tolist()], norm='l1')
+    #  Even if Norm L1 is better, dot product on Solr gives me less than 1 of itself. So will try with L2
+	X_l1 = preprocessing.normalize([vector.detach().tolist()], norm='l2')
 	# see https://nightlies.apache.org/solr/draft-guides/solr-reference-guide-antora/solr/10_0/query-guide/dense-vector-search.html
+	print(np.dot(X_l1[0], X_l1[0]));
 	data['yolo']['vector'] = X_l1[0].tolist()
 	data['message'] = 'done'
 
@@ -767,6 +769,6 @@ def mobilenet():
 # def tester():
 # 	return render_template('form.html')
 
-app.run(host='0.0.0.0', port=6400, debug=False)
+app.run(host='0.0.0.0', port=6401, debug=False)
 
 
