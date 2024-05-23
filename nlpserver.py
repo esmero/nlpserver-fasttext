@@ -599,7 +599,7 @@ def yolo():
 	if request.method == 'GET':
 		params['iiif_image_url'] = request.args.get('iiif_image_url')
 		params['labels'] = request.args.getlist('labels')
-		params['norm'] = request.args.getlist('norm')
+		params['norm'] = request.args.get('norm')
 	elif request.method == 'POST':
 		params = request.form # postdata
 	else:
@@ -707,9 +707,10 @@ def mobilenet():
 	data['efficientdet'] = {}
 	params = {}
 	objects = []
-	
+
 	if request.method == 'GET':
 		params['iiif_image_url'] = request.args.get('iiif_image_url')
+		params['norm'] = request.args.get('norm')
 	elif request.method == 'POST':
 		params = request.form # postdata
 	else:
