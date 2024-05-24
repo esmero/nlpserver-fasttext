@@ -15,6 +15,7 @@ app.config["YOLO_MODEL_NAME"] = "yolov8m.pt"
 app.config["MOBILENET_MODEL_NAME"] = "mobilenet_v3_small.tflite"
 app.config["EFFICIENTDET_DETECT_MODEL_NAME"] = "efficientdet_lite2.tflite"
 app.config["MOBILENET_DETECT_MODEL_NAME"] = "ssd_mobilenet_v2.tflite"
+app.config["SENTENCE_TRANSFORMER_MODEL_FOLDER"] = "models/sentencetransformer/"
 for variable, value in os.environ.items():
 	if variable == "YOLO_MODEL_NAME":
 		# Can be set via Docker ENV
@@ -33,7 +34,7 @@ default_data['web64'] = {
 		'last_modified': '2024-05-05',
 		'documentation': 'https://github.com/esmero/nlpserver-fasttext/README.md',
 		'github': 'https://github.com/esmero/nlpserver-fasttext',
-		'endpoints': ['/status','/gensim/summarize', '/polyglot/neighbours', '/langid', '/polyglot/entities', '/polyglot/sentiment', '/newspaper', '/readability', '/spacy/entities', '/afinn', '/fasttext', '/image/yolo', '/image/mobilenet'],
+		'endpoints': ['/status','/gensim/summarize', '/polyglot/neighbours', '/langid', '/polyglot/entities', '/polyglot/sentiment', '/newspaper', '/readability', '/spacy/entities', '/afinn', '/fasttext', '/image/yolo', '/image/mobilenet', '/text/sentence_transformer'],
 	}
 
 default_data['message'] = 'NLP Server by web64.com - with fasttext addition by digitaldogsbody'
@@ -773,12 +774,70 @@ def mobilenet():
 	# This "should" return a Unit Vector so we can use "dot_product" in Solr
 	# in theory vision embedder here is already L2. But let's do it manually again.
 	normalized = preprocessing.normalize([vector], norm=params['norm'])
+	print(vector.shape[0])
 	# see https://nightlies.apache.org/solr/draft-guides/solr-reference-guide-antora/solr/10_0/query-guide/dense-vector-search.html
 	data['mobilenet']['vector'] = normalized[0].tolist()
 	data['mobilenet']['objects'] = objects
+	data['mobilenet']['modelinfo'] = {'version':app.config["MOBILENET_MODEL_NAME"]} 
 	data['message'] = 'done'
 	return jsonify(data)
 
+@app.route("/text/sentence_transformer", methods=['GET', 'POST'])
+def sentence_transformer():
+	from sentence_transformers import SentenceTransformer
+
+	data = dict(default_data)
+	data['message'] = 'Sentence transformer (embedding)'
+	data['sentence_transformer'] = {}
+	params = {}
+	# For s2p(short query to long passage) retrieval task, each short query should start with an instruction (instructions see Model List...NOTE link leads to nothing good). But the instruction is not needed for passages. #
+	instructions = ['Generate a representation for this sentence that can be used to retrieve related articles:']
+
+	if request.method == 'GET':
+		params['text'] = request.args.get('text')
+		params['query'] = request.args.get('query')
+	elif request.method == 'POST':
+		params = request.form # postdata
+	else:
+		data['error'] = 'Invalid request method'
+		return jsonify(data)
+
+	if not params:
+		data['error'] = 'Missing parameters'
+		return jsonify(data)
+
+	if not params['text']:
+		data['error'] = '[text] parameter not found'
+		return jsonify(data)
+	
+	if params['query']:
+		# query so we add the instruction
+		params['text'] = instructions[0] + params['text'];
+	
+	print(params['text'])
+
+	try:
+		model = SentenceTransformer('BAAI/bge-small-en-v1.5')
+	except ValueError:
+		data['error'] = app.config["SENTENCE_TRANSFORMER_MODEL_FOLDER"] + ' Failed'
+		return jsonify(data)
+	
+	if not model:
+		data['error'] = 'Sentence Transformer model not initialised'
+		return jsonify(data)
+
+	# class sentence_transformers.SentenceTransformer(model_name_or_path: Optional[str] = None, modules:
+	# Optional[Iterable[torch.nn.modules.module.Module]] = None, device: Optional[str] = None, prompts: Optional[Dict[str, 
+	#str]] = None, default_prompt_name: Optional[str] = None, cache_folder: Optional[str] = None, 
+	#trust_remote_code: bool = False, revision: Optional[str] = None, token: Optional[Union[bool, str]] = None, use_auth_token: Optional[Union[bool, str]] = None, truncate_dim: Optional[int] = None)
+	# M3 does not call to the outside, but other hugging face stuff does... why hugging face.
+	embed = model.encode(params['text'],normalize_embeddings=True)
+	print(embed.shape[0])
+	data['sentence_transformer']['vector'] = embed.tolist()
+	data['sentence_transformer']['modelinfo'] = model._model_config
+	data['message'] = "Done"
+
+	return jsonify(data)
 # @app.route("/tester", methods=['GET', 'POST'])
 # def tester():
 # 	return render_template('form.html')
