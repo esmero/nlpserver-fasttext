@@ -34,7 +34,7 @@ default_data['web64'] = {
 		'last_modified': '2024-05-05',
 		'documentation': 'https://github.com/esmero/nlpserver-fasttext/README.md',
 		'github': 'https://github.com/esmero/nlpserver-fasttext',
-		'endpoints': ['/status','/gensim/summarize', '/polyglot/neighbours', '/langid', '/polyglot/entities', '/polyglot/sentiment', '/newspaper', '/readability', '/spacy/entities', '/afinn', '/fasttext', '/image/yolo', '/image/mobilenet', '/text/sentence_transformer'],
+		'endpoints': ['/status','/gensim/summarize', '/polyglot/neighbours', '/langid', '/polyglot/entities', '/polyglot/sentiment', '/newspaper', '/readability', '/spacy/entities', '/afinn', '/fasttext', '/image/yolo', '/image/mobilenet', '/image/insightface', '/text/sentence_transformer'],
 	}
 
 default_data['message'] = 'NLP Server by web64.com - with fasttext addition by digitaldogsbody'
@@ -782,6 +782,136 @@ def mobilenet():
 	data['message'] = 'done'
 	return jsonify(data)
 
+@app.route("/image/insightface", methods=['GET', 'POST'])
+def insightface():
+	# Import your Libraries 
+	import torch
+	from torchvision import transforms
+	from PIL import Image, ImageDraw
+	from pathlib import Path
+	import pandas as pd
+	import numpy as np
+	from pathlib import Path
+	import requests
+	import cv2
+	from io import BytesIO
+	from keras.preprocessing.image import img_to_array
+	import insightface
+	from insightface.app import FaceAnalysis
+	from sklearn import preprocessing
+	import json
+
+	intermediate_features = []
+
+	def loadImage(url, size = 640):
+		try:
+			response = requests.get(url)
+			response.raise_for_status()
+		except requests.exceptions.RequestException as err:
+			data['error'] =  err.strerror
+			return False
+	
+		img_bytes = BytesIO(response.content)
+		img = Image.open(img_bytes)
+		img = img.convert('RGB')
+		img = np.array(img)
+		img = img[:, :, ::-1].copy()
+		return img
+	
+	data = dict(default_data)
+	data['message'] = "Insightface -  Parameters: 'iiif_image_url'"
+	data['insightface'] = {}
+	data['insightface']['objects']  = []
+	data['insightface']['vector']  = []
+	data['insightface']['modelinfo']  = {}
+	params = {}
+	
+
+	if request.method == 'GET':
+		params['iiif_image_url'] = request.args.get('iiif_image_url')
+		params['norm'] = request.args.get('norm')
+	elif request.method == 'POST':
+		params = request.form # postdata
+	else:
+		data['error'] = 'Invalid request method'
+		return jsonify(data)
+
+	if not params:
+		data['error'] = 'Missing parameters'
+		return jsonify(data)
+
+	if not params['iiif_image_url']:
+		data['error'] = '[iiif_image_url] parameter not found'
+		return jsonify(data)
+
+	if not params['norm']:
+		params['norm'] = 'l2'
+
+	if params['norm'] and params['norm'] not in ['l1','l2','max']:
+		params['norm'] = 'l2'
+
+	
+	try:
+		# providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
+		img = loadImage(params['iiif_image_url'], 640)
+		if img is not False:
+			app = FaceAnalysis(providers=['CPUExecutionProvider'])
+			# This will get all models. Inclussive age, gender. (bad juju) etc. But we won't return those
+			# We could limit to just 'detection' and 'recognition' (last one provides the embeddings)
+			app.prepare(ctx_id=0, det_size=(640, 640))
+		# img = ins_get_image('t1')
+		    # by default will only get me bboxs and eyes, etc.
+			faces = app.get(img, max_num=1)
+			#faces = app.det_model.detect(img, max_num=1, metric='default')
+			for idx, face in enumerate(faces):
+				if face.embedding is None:
+					if face.bbox.shape[0] !=0:
+						faces[idx] = app.models['recognition'].get(img, face.kps)
+			
+		# face.normed_embedding()  by default will be also L2.
+		# rimg = app.draw_on(img, faces)
+		# cv2.imwrite("./t1_output.jpg", rimg)
+	except ValueError:
+		data['error'] = 'Failed to execute Insigthface'
+		return jsonify(data)
+	
+	if not app:
+		data['error'] = ' Insigthface model not initialized'
+		return jsonify(data)
+
+	if not faces or faces[0].bbox.shape[0] != 4:
+		data['message'] = 'No face detected'
+		return jsonify(data)
+
+	# we need to bring data back to percentage
+	for idx in range(len(faces)):
+			faces[idx].bbox[0] = faces[idx].bbox[0].item()/img.shape[0]
+			faces[idx].bbox[1] = faces[idx].bbox[1].item()/img.shape[1]
+			faces[idx].bbox[2] = faces[idx].bbox[2].item()/img.shape[0]
+			faces[idx].bbox[3] = faces[idx].bbox[3].item()/img.shape[1]
+	# It was already normalized by ArcFace BUT the origal array is a list of Objects. This actuallty flattes it to float32.	Values stay the same.	
+	normalized = preprocessing.normalize([faces[0].normed_embedding], norm='l2')
+
+	data['insightface']['objects']  = [{ "bbox": faces[0].bbox.tolist(), "score": faces[0].det_score.item()}]
+	data['insightface']['vector']  =  normalized[0].tolist()
+	data['insightface']['modelinfo']  = {}
+	data['message'] = 'done'
+	
+	# features =  extract_features(intermediate_features=intermediate_features,model=model, img = img) // More advanced. Step 2
+	#vector = faces.embed(img, verbose=False)[0]
+	#print(vector.shape[0])
+	# Vector size for this layer (i think by default it will be numlayers - 2 so 20) is 576
+	# array.reshape(-1, 1) if your data has a single feature or array.reshape(1, -1) if it contains a single sample
+	# This "should" return a Unit Vector so we can use "dot_product" in Solr
+    #  Even if Norm L1 is better for comparison, dot product on Solr gives me less than 1 of itself. So will try with L2
+	# normalized = preprocessing.normalize([vector.detach().tolist()], norm=params['norm'])
+	# see https://nightlies.apache.org/solr/draft-guides/solr-reference-guide-antora/solr/10_0/query-guide/dense-vector-search.html
+	# interesting, this is never 1 sharp... like 1.000000005 etc ... mmmm print(np.dot(normalized[0], normalized[0]));
+	#data['insigthface']['vector'] = normalized[0].tolist()
+	#data['message'] = 'done'
+
+	return jsonify(data)
+
 @app.route("/text/sentence_transformer", methods=['GET', 'POST'])
 def sentence_transformer():
 	from sentence_transformers import SentenceTransformer
@@ -813,8 +943,6 @@ def sentence_transformer():
 	if params['query']:
 		# query so we add the instruction
 		params['text'] = instructions[0] + params['text'];
-	
-	print(params['text'])
 
 	try:
 		model = SentenceTransformer('BAAI/bge-small-en-v1.5')
