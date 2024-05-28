@@ -884,11 +884,12 @@ def insightface():
 		return jsonify(data)
 
 	# we need to bring data back to percentage
+	# Shape dimensions are reversed ... [1] is X, [0] is Y
 	for idx in range(len(faces)):
-			faces[idx].bbox[0] = faces[idx].bbox[0].item()/img.shape[0]
-			faces[idx].bbox[1] = faces[idx].bbox[1].item()/img.shape[1]
-			faces[idx].bbox[2] = faces[idx].bbox[2].item()/img.shape[0]
-			faces[idx].bbox[3] = faces[idx].bbox[3].item()/img.shape[1]
+			faces[idx].bbox[0] = faces[idx].bbox[0].item()/img.shape[1]
+			faces[idx].bbox[1] = faces[idx].bbox[1].item()/img.shape[0]
+			faces[idx].bbox[2] = faces[idx].bbox[2].item()/img.shape[1]
+			faces[idx].bbox[3] = faces[idx].bbox[3].item()/img.shape[0]
 	# It was already normalized by ArcFace BUT the origal array is a list of Objects. This actuallty flattes it to float32.	Values stay the same.	
 	normalized = preprocessing.normalize([faces[0].normed_embedding], norm='l2')
 
