@@ -657,12 +657,12 @@ def yolo():
 	# features =  extract_features(intermediate_features=intermediate_features,model=model, img = img) // More advanced. Step 2
 	# The embed method is pretty new. 
 	vector = model.embed(img, verbose=False)[0]
-	print(vector.shape[0])
 	# Vector size for this layer (i think by default it will be numlayers - 2 so 20) is 576
 	# array.reshape(-1, 1) if your data has a single feature or array.reshape(1, -1) if it contains a single sample
 	# This "should" return a Unit Vector so we can use "dot_product" in Solr
     #  Even if Norm L1 is better for comparison, dot product on Solr gives me less than 1 of itself. So will try with L2
 	normalized = preprocessing.normalize([vector.detach().tolist()], norm=params['norm'])
+	print('Embedding size ' +  str(normalized[0].shape[0]))
 	# see https://nightlies.apache.org/solr/draft-guides/solr-reference-guide-antora/solr/10_0/query-guide/dense-vector-search.html
 	# interesting, this is never 1 sharp... like 1.000000005 etc ... mmmm print(np.dot(normalized[0], normalized[0]));
 	data['yolo']['vector'] = normalized[0].tolist()
@@ -774,7 +774,7 @@ def mobilenet():
 	# This "should" return a Unit Vector so we can use "dot_product" in Solr
 	# in theory vision embedder here is already L2. But let's do it manually again.
 	normalized = preprocessing.normalize([vector], norm=params['norm'])
-	print(vector.shape[0])
+	print('Embedding size ' +  str(normalized[0].shape[0]))
 	# see https://nightlies.apache.org/solr/draft-guides/solr-reference-guide-antora/solr/10_0/query-guide/dense-vector-search.html
 	data['mobilenet']['vector'] = normalized[0].tolist()
 	data['mobilenet']['objects'] = objects
@@ -849,13 +849,14 @@ def insightface():
 
 	if params['norm'] and params['norm'] not in ['l1','l2','max']:
 		params['norm'] = 'l2'
-
+	
+	app = False
 	
 	try:
 		# providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
 		img = loadImage(params['iiif_image_url'], 640)
 		if img is not False:
-			app = FaceAnalysis(providers=['CPUExecutionProvider'])
+			app = FaceAnalysis(name='buffalo_l', root='models/insightface', providers=['CPUExecutionProvider'])
 			# This will get all models. Inclussive age, gender. (bad juju) etc. But we won't return those
 			# We could limit to just 'detection' and 'recognition' (last one provides the embeddings)
 			app.prepare(ctx_id=0, det_size=(640, 640))
@@ -876,7 +877,7 @@ def insightface():
 		return jsonify(data)
 	
 	if not app:
-		data['error'] = ' Insigthface model not initialized'
+		data['error'] = 'Insigthface model not initialized'
 		return jsonify(data)
 
 	if not faces or faces[0].bbox.shape[0] != 4:
@@ -891,8 +892,8 @@ def insightface():
 			faces[idx].bbox[2] = faces[idx].bbox[2].item()/img.shape[1]
 			faces[idx].bbox[3] = faces[idx].bbox[3].item()/img.shape[0]
 	# It was already normalized by ArcFace BUT the origal array is a list of Objects. This actuallty flattes it to float32.	Values stay the same.	
-	normalized = preprocessing.normalize([faces[0].normed_embedding], norm='l2')
-
+	normalized = preprocessing.normalize([faces[0].normed_embedding], norm=params['norm'])
+	print('Embedding size ' + str(normalized[0].shape[0]))
 	data['insightface']['objects']  = [{ "bbox": faces[0].bbox.tolist(), "score": faces[0].det_score.item()}]
 	data['insightface']['vector']  =  normalized[0].tolist()
 	data['insightface']['modelinfo']  = {}
