@@ -4,7 +4,8 @@
 #	To run:
 # 	$ nohup python3 nlpserver.py  >logs/nlpserver_out.log 2>logs/nlpserver_errors.log &
 #
-from flask import Flask, jsonify, abort, request, send_from_directory, render_template
+from flask import Flask, jsonify, request, send_from_directory, render_template
+from tensorflow.keras.utils import img_to_array 
 import os
 
 app = Flask(__name__)
@@ -558,10 +559,8 @@ def yolo():
 	from ultralytics import YOLO
 	import pandas as pd
 	import numpy as np
-	from pathlib import Path
 	import requests
 	from io import BytesIO
-	from keras.preprocessing.image import img_to_array
 	from sklearn import preprocessing
 	import json
 
@@ -676,7 +675,6 @@ def mobilenet():
 	from pathlib import Path
 	import pandas as pd
 	import numpy as np
-	from pathlib import Path
 	import requests
 	from io import BytesIO
 	from sklearn import preprocessing
@@ -785,7 +783,6 @@ def mobilenet():
 @app.route("/image/insightface", methods=['GET', 'POST'])
 def insightface():
 	# Import your Libraries 
-	import torch
 	from torchvision import transforms
 	from PIL import Image, ImageDraw
 	from pathlib import Path
@@ -793,10 +790,7 @@ def insightface():
 	import numpy as np
 	from pathlib import Path
 	import requests
-	import cv2
 	from io import BytesIO
-	from keras.preprocessing.image import img_to_array
-	import insightface
 	from insightface.app import FaceAnalysis
 	from sklearn import preprocessing
 	import json
@@ -871,7 +865,6 @@ def insightface():
 			
 		# face.normed_embedding()  by default will be also L2.
 		# rimg = app.draw_on(img, faces)
-		# cv2.imwrite("./t1_output.jpg", rimg)
 	except ValueError:
 		data['error'] = 'Failed to execute Insigthface'
 		return jsonify(data)
