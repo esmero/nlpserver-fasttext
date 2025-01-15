@@ -35,7 +35,7 @@ default_data['web64'] = {
 		'last_modified': '2024-05-05',
 		'documentation': 'https://github.com/esmero/nlpserver-fasttext/README.md',
 		'github': 'https://github.com/esmero/nlpserver-fasttext',
-		'endpoints': ['/status','/gensim/summarize', '/polyglot/neighbours', '/langid', '/polyglot/entities', '/polyglot/sentiment', '/newspaper', '/readability', '/spacy/entities', '/afinn', '/fasttext', '/image/yolo', '/image/mobilenet', '/image/insightface', '/text/sentence_transformer'],
+		'endpoints': ['/status','/gensim/summarize', '/polyglot/neighbours', '/langid', '/polyglot/entities', '/polyglot/sentiment', '/newspaper', '/readability', '/spacy/entities', '/afinn', '/fasttext', '/image/yolo', '/image/mobilenet', '/image/insightface','/image/vision_transformer','/text/sentence_transformer'],
 	}
 
 default_data['message'] = 'NLP Server by web64.com - with fasttext addition by digitaldogsbody'
@@ -95,14 +95,14 @@ def status():
 	except ImportError:
 		data['missing_libraries'].append('polyglot')
 	else:
-		from polyglot.downloader import Downloader
-		dwnld = Downloader()
+		#from polyglot.downloader import Downloader
+		#dwnld = Downloader()
 		data['polyglot_lang_models'] = {}
 
-		for info in sorted(dwnld.collections(), key=str):
-			status = dwnld.status(info)
-			if info.id.startswith('LANG:') and status != 'not installed':
-				data['polyglot_lang_models'][info.id] = status
+		#for info in sorted(dwnld.collections(), key=str):
+		#	status = dwnld.status(info)
+		#	if info.id.startswith('LANG:') and status != 'not installed':
+		#		data['polyglot_lang_models'][info.id] = status
 	
 	try:
 		import fasttext
@@ -961,6 +961,117 @@ def sentence_transformer():
 	data['message'] = "Done"
 
 	return jsonify(data)
+@app.route("/image/vision_transformer", methods=['GET', 'POST'])
+def vision_transformer():
+	# Import your Libraries 
+	from transformers import ViTForImageClassification, ViTImageProcessor, pipeline
+	import torch
+	from PIL import Image
+	from pathlib import Path
+	import pandas as pd
+	import numpy as np
+	import requests
+	from io import BytesIO
+	from sklearn import preprocessing
+
+	intermediate_features = []
+
+	def loadImage(url, size = 224):
+		try:
+			response = requests.get(url)
+			response.raise_for_status()
+		except requests.exceptions.RequestException as err:
+			data['error'] =  err.strerror
+			return jsonify(data)
+	
+		img_bytes = BytesIO(response.content)
+		img = Image.open(img_bytes)
+		img = img.convert('RGB')
+		device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+		processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
+		inputs = processor(images=img, return_tensors="pt").to(device)
+		pixel_values = inputs.pixel_values
+		return pixel_values
+	
+	data = dict(default_data)
+	data['message'] = "ViT -  Parameters: 'iiif_image_url"
+	data['vision_transformer'] = {}
+
+	params = {}
+	objects = []
+
+	if request.method == 'GET':
+		params['iiif_image_url'] = request.args.get('iiif_image_url')
+		params['norm'] = request.args.get('norm')
+	elif request.method == 'POST':
+		params = request.form # postdata
+	else:
+		data['error'] = 'Invalid request method'
+		return jsonify(data)
+
+	if not params:
+		data['error'] = 'Missing parameters'
+		return jsonify(data)
+
+	if not params['iiif_image_url']:
+		data['error'] = '[iiif_image_url] parameter not found'
+		return jsonify(data)
+	if not params['norm']:
+		params['norm'] = 'l2'
+
+	if params['norm'] not in ['l1','l2','max']:
+		params['norm'] = 'l2'
+	
+
+	try:
+		# Create options for Image Embedder
+		device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+		# or google/vit-base-patch16-224-in21k which has 21,843 classes v/s 10K on the normal one
+		# but has no actual label/output, so requires "refining" see https://huggingface.co/google/vit-base-patch16-224-in21k
+		# We should also check https://huggingface.co/apple/DFN5B-CLIP-ViT-H-14-378 
+		model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224')
+		model.to(device)
+		img = loadImage(params['iiif_image_url'], 224)
+		objects = []
+		normalized = []
+		with torch.no_grad():
+			outputs = model(img, output_hidden_states=True)
+			logits = outputs.logits
+			logits.shape
+			best_prediction = logits.argmax(-1)
+			print("Best Predicted class:", model.config.id2label[best_prediction.item()])
+			# All predictions
+			allpredictions = (-logits).argsort(axis=-1)[:, :3]
+			for prediction in allpredictions[0]:
+				detection = {}
+				detection["bounding_box"] = {}
+				#TODO convert attention grey maps into actual annotations. For now 100% coverage
+				detection["bounding_box"]["origin_y"] = 0
+				detection["bounding_box"]["origin_x"] = 0
+				detection["bounding_box"]["width"]= 1
+				detection["bounding_box"]["height"] = 1
+				detection["label"] = model.config.id2label[prediction.item()]
+				# this is a tensor so we need to detach and then get the item
+				detection["score"] = torch.softmax(logits, 1)[0][prediction.item()].detach().item()
+				objects.append(detection)
+				
+			vec1 = outputs.hidden_states[-1][0, 0, :].squeeze(0) 
+			normalized = preprocessing.normalize([vec1.detach().tolist()], norm=params['norm'])
+			print('Embedding size ' +  str(normalized[0].shape[0]))
+			normalized = normalized[0].tolist()
+
+		#print(output.pooler_output.shape)
+		#print(output.last_hidden_state.shape)
+	except ValueError:
+		data['message'] = 'error'
+		return jsonify(data)
+
+	data['vision_transformer']['vector'] = normalized
+	data['vision_transformer']['objects'] = objects
+	data['vision_transformer']['modelinfo'] = {'version':'vit-base-patch16-224'} 
+	data['message'] = 'done'
+	return jsonify(data)
+
 # @app.route("/tester", methods=['GET', 'POST'])
 # def tester():
 # 	return render_template('form.html')
