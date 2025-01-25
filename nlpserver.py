@@ -587,8 +587,11 @@ def yolo():
 		img = Image.open(img_bytes)
 		img = img.convert('RGB')
 		img = img.resize((size,size), Image.NEAREST)
-		img = img_to_array(img)
-		return img
+
+		rgbimg = Image.new("RGB", img.size)
+		rgbimg.paste(img)
+		rgbimg = img_to_array(rgbimg)
+		return rgbimg
 	
 	data = dict(default_data)
 	data['message'] = "Yolo -  Parameters: 'iiif_image_url', 'labels' a list of valid labels for object detection (default: face)"
@@ -696,9 +699,11 @@ def mobilenet():
 		img = Image.open(img_bytes)
 		img = img.convert('RGB')
 		img.thumbnail((size,size), Image.NEAREST)
+		rgbimg = Image.new("RGB", img.size)
+		rgbimg.paste(img)
 		# Media pipe uses a different format than YOLO, img here is PIL
-		img = np.asarray(img)
-		return img
+		rgbimg = np.asarray(rgbimg)
+		return rgbimg
 	
 	data = dict(default_data)
 	data['message'] = "mobilenet -  Parameters: 'iiif_image_url"
@@ -808,9 +813,11 @@ def insightface():
 		img_bytes = BytesIO(response.content)
 		img = Image.open(img_bytes)
 		img = img.convert('RGB')
-		img = np.array(img)
-		img = img[:, :, ::-1].copy()
-		return img
+		rgbimg = Image.new("RGB", img.size)
+		rgbimg.paste(img)
+		rgbimg = np.array(rgbimg)
+		rgbimg = rgbimg[:, :, ::-1].copy()
+		return rgbimg
 	
 	data = dict(default_data)
 	data['message'] = "Insightface -  Parameters: 'iiif_image_url'"
@@ -987,9 +994,11 @@ def vision_transformer():
 		img_bytes = BytesIO(response.content)
 		img = Image.open(img_bytes)
 		img = img.convert('RGB')
+		rgbimg = Image.new("RGB", img.size)
+		rgbimg.paste(img)
 		device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 		processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
-		inputs = processor(images=img, return_tensors="pt").to(device)
+		inputs = processor(images=rgbimg, return_tensors="pt").to(device)
 		pixel_values = inputs.pixel_values
 		return pixel_values
 	
