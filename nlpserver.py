@@ -79,14 +79,7 @@ def status():
 	except ImportError:
 		data['missing_libraries'].append('polyglot')
 	else:
-		from polyglot.downloader import Downloader
-		dwnld = Downloader()
 		data['polyglot_lang_models'] = {}
-
-		for info in sorted(dwnld.collections(), key=str):
-			status = dwnld.status(info)
-			if info.id.startswith('LANG:') and status != 'not installed':
-				data['polyglot_lang_models'][info.id] = status
 	
 	try:
 		import fasttext
